@@ -1,0 +1,68 @@
+id: fastx3-gritty-unauth-rce
+
+info:
+  name: FastX 3 - Unauthenticated Remote Code Execution via /gritty
+  author: bandrel
+  severity: critical
+  description: |
+    Unauthenticated remote code execution. Affected FastX 3 builds mount a
+    Socket.IO server with a `/gritty` terminal namespace that emits `accept`
+    to any connecting client, with no authentication check. A client that
+    reaches `accept` can send a `terminal` event and run arbitrary commands
+    as the FastX service account, with no credentials and no session.
+
+    Detection only. The template performs the Engine.IO v3 polling handshake,
+    joins `/gritty`, and matches on the server's `accept` event. It never sends
+    a `terminal` event and runs no command; it is the equivalent of
+    `fastx32shell rce --dry-run`. A build with an auth handler on the namespace
+    joins but never emits `accept`; a build without the namespace fails the
+    handshake or the join.
+  metadata:
+    verified: true
+    max-request: 3
+    product: fastx
+    vendor: starnet
+  tags: fastx,starnet,socketio,rce,unauth
+
+http:
+  - raw:
+      - |
+        GET /socket.io/?EIO=3&transport=polling&t=nuclei1 HTTP/1.1
+        Host: {{Hostname}}
+        Origin: {{RootURL}}
+        Referer: {{RootURL}}/terminal/
+
+      - |
+        POST /socket.io/?EIO=3&transport=polling&sid={{sid}}&t=nuclei2 HTTP/1.1
+        Host: {{Hostname}}
+        Origin: {{RootURL}}
+        Referer: {{RootURL}}/terminal/
+        Content-Type: text/plain;charset=UTF-8
+
+        10:40/gritty,
+
+      - |
+        GET /socket.io/?EIO=3&transport=polling&sid={{sid}}&t=nuclei3 HTTP/1.1
+        Host: {{Hostname}}
+        Origin: {{RootURL}}
+        Referer: {{RootURL}}/terminal/
+
+    extractors:
+      - type: regex
+        name: sid
+        part: body_1
+        internal: true
+        group: 1
+        regex:
+          - '"sid"\s*:\s*"([A-Za-z0-9_-]+)"'
+
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code_1 == 200 && status_code_2 == 200 && status_code_3 == 200"
+
+      - type: word
+        part: body_3
+        words:
+          - '42/gritty,["accept"'

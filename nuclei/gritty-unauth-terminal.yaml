@@ -1,0 +1,75 @@
+id: gritty-unauth-terminal
+
+info:
+  name: gritty - Unauthenticated Web Terminal (Remote Code Execution)
+  author: bandrel
+  severity: critical
+  description: |
+    Unauthenticated remote code execution through the gritty web terminal.
+    gritty's `gritty.listen()` only asks for credentials when the embedding
+    application passes an `auth` callback; without one, every client that
+    joins the `/gritty` Socket.IO namespace receives `accept` and can start a
+    terminal. gritty's own CLI never passes one. Cloud Commander passes a
+    callback, but it accepts any credentials while `auth` is off, which is the
+    default, so `cloudcmd --terminal` without `--auth` is exposed.
+
+    This template targets current gritty on socket.io 4 (Engine.IO v4). For
+    FastX 3, which runs Engine.IO v3, use fastx3-gritty-unauth-rce.
+
+    Detection only. The template joins `/gritty`, sends an `auth` event with
+    empty credentials (which a server enforcing auth rejects), and matches on
+    `accept`. It never sends a `terminal` event and runs no command. For an
+    install under a URL prefix, scan the prefixed URL, for example
+    https://host/cc.
+  reference:
+    - https://github.com/cloudcmd/gritty
+    - https://github.com/coderaiser/cloudcmd
+  metadata:
+    verified: true
+    max-request: 4
+    product: gritty
+    vendor: coderaiser
+  tags: gritty,cloudcmd,socketio,rce,unauth
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/socket.io/?EIO=4&transport=polling&t=nuclei1"
+
+    extractors:
+      - type: regex
+        name: sid
+        part: body
+        internal: true
+        group: 1
+        regex:
+          - '"sid"\s*:\s*"([A-Za-z0-9_-]+)"'
+
+  - method: POST
+    path:
+      - "{{BaseURL}}/socket.io/?EIO=4&transport=polling&sid={{sid}}&t=nuclei2"
+    headers:
+      Content-Type: text/plain;charset=UTF-8
+    body: "40/gritty,"
+
+  - method: POST
+    path:
+      - "{{BaseURL}}/socket.io/?EIO=4&transport=polling&sid={{sid}}&t=nuclei3"
+    headers:
+      Content-Type: text/plain;charset=UTF-8
+    body: '42/gritty,["auth","",""]'
+
+  - method: GET
+    path:
+      - "{{BaseURL}}/socket.io/?EIO=4&transport=polling&sid={{sid}}&t=nuclei4"
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+
+      - type: word
+        part: body
+        words:
+          - '42/gritty,["accept"'

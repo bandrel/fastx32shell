@@ -1,0 +1,42 @@
+id: fastx3-version-detect
+
+info:
+  name: StarNet FastX 3 - Version Detection
+  author: bandrel
+  severity: info
+  description: |
+    FastX 3 exposes its build string to unauthenticated clients at GET /v3/api/
+    as result.build. The value is the three-part build number (for example
+    3.0.47) and is the same string fastx32shell's scan subcommand classifies
+    against its version matrix.
+
+    This reports the build only; it does not classify it or send any
+    exploiting request. A build number is attacker-controlled text, so treat
+    an extracted value as untrusted.
+  reference:
+    - https://www.starnet.com/fastx/
+  metadata:
+    verified: true
+    max-request: 1
+    vendor: starnet
+    product: fastx
+    shodan-query: http.title:"FastX"
+  tags: starnet,fastx,tech,detect
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/v3/api/"
+
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - '"build"\s*:\s*"[0-9]+\.[0-9]+\.[0-9]+'
+
+    extractors:
+      - type: regex
+        part: body
+        group: 1
+        regex:
+          - '"build"\s*:\s*"([0-9]+\.[0-9]+\.[0-9]+[^"]*)"'

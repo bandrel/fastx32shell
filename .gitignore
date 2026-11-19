@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
+
+# Recovered material and tool output. Nothing read off a target belongs in
+# version control, and neither does anything that signs a token.
+loot/
+evidence/
+findings/
+poc/
+*.jwt
+*.pem
+*.key
+token.jwt
+serverId*.txt
+
+# Isolated worktrees for plan execution
+.worktrees/
